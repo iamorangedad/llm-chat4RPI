@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <title>本地 LLM 对话助手</title>
+    <link rel="stylesheet" href="/static/style_openai.css">
+</head>
+
+<body>
+    <h2>🤖 本地 LLM 对话助手</h2>
+    <div id="chat-box"></div>
+    <input id="user-input" placeholder="输入你的问题..." autofocus>
+    <button onclick="sendMessage()">发送</button>
+
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById("user-input");
+            const chatBox = document.getElementById("chat-box");
+            const message = input.value;
+            input.value = "";
+
+            chatBox.innerHTML += `<div class="user">🧑‍💻 ${message}</div>`;
+            chatBox.innerHTML += `<div class="bot">🤖 正在思考...</div>`;
+
+            const response = await fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message })
+            });
+
+            const reader = response.body.getReader();
+            let text = "";
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                text += decoder.decode(value);
+                chatBox.lastElementChild.innerHTML = `🤖 ${text}`;
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地 LLM 助手</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #chat-container {
+            width: 90%;
+            max-width: 600px;
+            height: 80vh;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #chat-box {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            line-height: 1.5;
+            max-width: 85%;
+        }
+
+        .user-message {
+            background-color: #007aff;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .bot-message {
+            background-color: #e5e5ea;
+            color: black;
+            align-self: flex-start;
+            margin-right: auto;
+        }
+
+        #input-area {
+            display: flex;
+            padding: 20px;
+        }
+
+        #prompt-input {
+            flex-grow: 1;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 10px 15px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        #send-button {
+            border: none;
+            background-color: #007aff;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        #send-button:disabled {
+            background-color: #a0a0a0;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="chat-container">
+        <div id="chat-box">
+            <div class="message bot-message">你好！我是你的本地 AI 助手。你今天想聊些什么？</div>
+        </div>
+        <div id="input-area">
+            <input type="text" id="prompt-input" placeholder="输入你的消息...">
+            <button id="send-button">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // API 端点
+        const API_URL = 'http://10.0.0.26:8000/api/chat'; // 你的 FastAPI 后端地址
+
+        // 获取 DOM 元素
+        const chatBox = document.getElementById('chat-box');
+        const promptInput = document.getElementById('prompt-input');
+        const sendButton = document.getElementById('send-button');
+
+        // "发送" 按钮的点击事件
+        sendButton.addEventListener('click', sendMessage);
+
+        // "回车键" 事件
+        promptInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // 阻止默认的回车换行
+                sendMessage();
+            }
+        });
+
+        // 发送消息的函数
+        async function sendMessage() {
+            const prompt = promptInput.value.trim();
+            if (prompt === '') return; // 不发送空消息
+
+            // 1. 在聊天框显示用户消息
+            addMessageToChatBox(prompt, 'user');
+
+            // 2. 清空输入框并禁用按钮
+            promptInput.value = '';
+            sendButton.disabled = true;
+            sendButton.textContent = '思考中...';
+
+            try {
+                // 3. 发送请求到 FastAPI 后端
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        model: 'llama3' // 你可以在这里硬编码或添加一个下拉框来选择模型
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // 4. 在聊天框显示机器人的响应
+                if (data.response) {
+                    addMessageToChatBox(data.response, 'bot');
+                } else if (data.error) {
+                    addMessageToChatBox(`错误: ${data.error}`, 'bot');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                addMessageToChatBox(`连接错误: ${error.message}`, 'bot');
+            } finally {
+                // 5. 恢复按钮
+                sendButton.disabled = false;
+                sendButton.textContent = '发送';
+                promptInput.focus(); // 让用户可以继续输入
+            }
+        }
+
+        // 辅助函数：将消息添加到聊天框
+        function addMessageToChatBox(text, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+            messageElement.textContent = text;
+
+            chatBox.appendChild(messageElement);
+
+            // 自动滚动到底部
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>

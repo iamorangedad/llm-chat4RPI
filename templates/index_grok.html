@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>树莓派 LLM 助手</title>
+    <link rel="stylesheet" href="/static/style_grok.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f0f2f5;
+            padding: 1rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
+        #chat {
+            height: 65vh;
+            overflow-y: auto;
+            background: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .msg {
+            margin: 0.5rem 0;
+            padding: 0.5rem 0.8rem;
+            border-radius: 16px;
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .user {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+        }
+
+        .bot {
+            background: #e5e5ea;
+            color: #000;
+        }
+
+        #input-area {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 0.75rem 1rem;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+        }
+
+        button:disabled {
+            background: #ccc;
+        }
+
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>树莓派 LLM 助手</h1>
+    <div id="chat"></div>
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="说点什么..." />
+        <button id="send-btn">发送</button>
+    </div>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const input = document.getElementById('user-input');
+        const btn = document.getElementById('send-btn');
+        let history = [];
+
+        function addMsg(role, text) {
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            div.textContent = text;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function send() {
+            const msg = input.value.trim();
+            if (!msg) return;
+            addMsg('user', msg);
+            input.value = '';
+            btn.disabled = true;
+
+            history.push({ role: 'user', content: msg });
+            if (history.length > 20) history = history.slice(-10);
+
+            const form = new FormData();
+            form.append('user_input', msg);
+            form.append('history', JSON.stringify(history));
+
+            const resp = await fetch('/chat', { method: 'POST', body: form });
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let botMsg = '';
+            let botDiv = document.createElement('div');
+            botDiv.className = 'msg bot';
+            chat.appendChild(botDiv);
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const text = decoder.decode(value);
+                text.split('\n').filter(l => l).forEach(line => {
+                    try {
+                        const data = JSON.parse(line);
+                        botMsg += data.content;
+                        botDiv.textContent = botMsg;
+                        chat.scrollTop = chat.scrollHeight;
+                    } catch { }
+                });
+            }
+
+            history.push({ role: 'assistant', content: botMsg });
+            btn.disabled = false;
+            input.focus();
+        }
+
+        btn.onclick = send;
+        input.onkeydown = e => { if (e.key === 'Enter') send(); };
+    </script>
+</body>
+
+</html>
