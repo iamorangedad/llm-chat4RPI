@@ -2,7 +2,7 @@
 
 A local AI chat assistant based on Ollama + FastAPI + Qwen3, featuring real-time thinking process visualization.
 
-[中文文档](README.md) | English
+![](assets/screenshot.png)
 
 ## ✨ Features
 
